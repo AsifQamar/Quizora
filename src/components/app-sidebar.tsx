@@ -1,79 +1,62 @@
-import * as React from "react"
+import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  AudioWaveform,
-  BookA,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  NotebookPen,
-  PenBox,
-  PenLine,
-  PenOffIcon,
-  PenSquareIcon,
-  PercentSquare,
-  PieChart,
-  Settings2,
   SquareTerminal,
-} from "lucide-react"
+  Users,
+  BookOpen,
+} from "lucide-react";
 
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
-import TeamSwitcher from "@/components/team-switcher"
+import { NavMain } from "@/components/nav-main";
+import TeamSwitcher from "@/components/team-switcher";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarRail,
   SidebarGroup,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-} from "@/components/ui/sidebar"
-
-// This is sample data.
-const data = {
-  navMain: [
-    {
-      title: "Quizzes",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      // items will be filled dynamically from the Convex DB
-      items: [],
-    },
-  ],
-}
+} from "@/components/ui/sidebar";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  // Fetch quizzes created by the currently authenticated user
   const myQuizzes = useQuery(api.quizzes.getMyQuizzes);
+  const sharedQuizzes = useQuery(api.sharing.getSharedQuizzes);
   const navigate = useNavigate();
-  // Map the quizzes to nav items; when not loaded yet, keep the static placeholder
-  const quizItems =
+
+  const myQuizItems =
     myQuizzes && myQuizzes.length > 0
       ? myQuizzes.map((q: any) => ({ title: q.title || "Untitled", url: `/quiz/${String(q._id)}` }))
-      : [
-        { title: "History", url: "#" },
-        { title: "Starred", url: "#" },
-      ];
+      : [];
+
+  const sharedQuizItems =
+    sharedQuizzes && sharedQuizzes.length > 0
+      ? sharedQuizzes.map((q: any) => ({ title: q.title, url: `/quiz/${String(q._id)}` }))
+      : [];
 
   const navMain = [
     {
-      title: "Quizzes",
-      url: "#",
+      title: "My Quizzes",
+      url: "/dashboard",
       icon: SquareTerminal,
       isActive: true,
-      items: quizItems,
+      items: myQuizItems,
     },
+    ...(sharedQuizItems.length > 0
+      ? [
+        {
+          title: "Shared with me",
+          url: "/dashboard?tab=shared",
+          icon: Users,
+          isActive: true,
+          items: sharedQuizItems,
+        },
+      ]
+      : []),
   ];
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -89,7 +72,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   onClick={() => navigate("/my-attempts")}
                   className="flex items-center gap-2 w-full text-left"
                 >
-                  <BookOpen />
+                  <BookOpen className="h-4 w-4" />
                   <span>My Attempts</span>
                 </button>
               </SidebarMenuButton>
@@ -99,7 +82,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
-  )
+  );
 }
-
-

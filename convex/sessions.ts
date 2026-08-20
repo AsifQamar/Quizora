@@ -1,6 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
+import { canHostQuiz } from "./sharing";
+
 // Helper function to generate a 6-character join code
 const generateJoinCode = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -41,7 +43,8 @@ export const createSession = mutation({
       throw new Error("Quiz not found.");
     }
 
-    if (quiz.creatorId !== identity.subject) {
+    const authorized = await canHostQuiz(ctx, args.quizId, identity.subject);
+    if (!authorized) {
       throw new Error("You are not authorized to host this quiz.");
     }
 

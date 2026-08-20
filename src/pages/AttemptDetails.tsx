@@ -5,12 +5,35 @@ import { Button } from "@/components/ui/button";
 import { Id } from "../../convex/_generated/dataModel";
 
 
+import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
+
 export default function AttemptDetails() {
   const { sessionId } = useParams();
   const [searchParams] = useSearchParams();
-  const participantId = searchParams.get("participant");
+  const searchParticipantId = searchParams.get("participant");
 
   const navigate = useNavigate();
+
+  // Fallback to localStorage if search param was lost on refresh
+  let participantId = searchParticipantId;
+  if (sessionId && !participantId) {
+    try {
+      participantId = localStorage.getItem(`attempt_participant_${sessionId}`);
+    } catch (e) {
+      // ignore storage error
+    }
+  }
+
+  useEffect(() => {
+    if (sessionId && searchParticipantId) {
+      try {
+        localStorage.setItem(`attempt_participant_${sessionId}`, searchParticipantId);
+      } catch (e) {
+        // ignore storage error
+      }
+    }
+  }, [sessionId, searchParticipantId]);
 
   const data = useQuery(
     api.sessions.getPlayerSessionData,
@@ -28,16 +51,27 @@ export default function AttemptDetails() {
   const joinSession = useMutation(api.sessions.joinSession);
 
   if (!sessionId || !participantId) {
-    return <div className="p-6">Invalid attempt link.</div>;
+    return (
+      <div className="p-10 space-y-4">
+        <p>Invalid attempt link.</p>
+        <Button variant="outline" onClick={() => navigate("/my-attempts")}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to My Attempts
+        </Button>
+      </div>
+    );
   }
 
-  if (!data || !data.questions) {
-    return <div className="p-6">Loading attempt...</div>;
+  if (data === undefined) return <div className="p-10">Loading attempt...</div>;
+  if (data === null) {
+    return (
+      <div className="p-10 space-y-4">
+        <p>Attempt not found.</p>
+        <Button variant="outline" onClick={() => navigate("/my-attempts")}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to My Attempts
+        </Button>
+      </div>
+    );
   }
-
-  console.log("Params:", sessionId, participantId);
-  if (data === undefined) return <div>Loading attempt...</div>;
-  if (data === null) return <div>Attempt not found.</div>;
 
   console.log("Params:", sessionId, participantId);
   console.log("sessionId:", sessionId);

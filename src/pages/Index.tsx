@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Sparkles, Users, Zap } from "lucide-react";
 import { SignedIn } from "@clerk/clerk-react";
 import Footer from "@/components/Footer";
+import { motion } from "framer-motion";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -24,8 +25,13 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8 max-w-4xl mx-auto mb-16 justify-center items-center">
-
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col md:flex-row gap-8 max-w-4xl mx-auto mb-16 justify-center items-center"
+        >
           <Card
             className="rounded-2xl p-8 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer border-2 hover:border-secondary"
             onClick={() => navigate('/join')}
@@ -46,7 +52,7 @@ const Index = () => {
               </Button>
             </div>
           </Card>
-        </div>
+        </motion.div>
 
         <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {[
@@ -54,11 +60,18 @@ const Index = () => {
             { icon: Users, title: "Multiplayer Fun", desc: "Compete with friends and track the leaderboard" },
             { icon: Sparkles, title: "Custom Content", desc: "Add text or images to your questions" }
           ].map((feature, i) => (
-            <div key={i} className="text-center p-6 animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 100}ms` }}>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.5, delay: i * 0.15 }}
+              className="text-center p-6"
+            >
               <feature.icon className="w-12 h-12 mx-auto mb-3 text-primary" />
               <h3 className="font-bold mb-2">{feature.title}</h3>
               <p className="text-sm text-muted-foreground">{feature.desc}</p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

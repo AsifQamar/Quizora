@@ -2,99 +2,78 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Play, Copy, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Share2, Loader2, Edit } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { useAuth } from "@clerk/clerk-react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import { ShareQuizModal } from "@/components/ShareQuizModal";
 
 const QuizDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const { isLoaded, isSignedIn } = useAuth();
 
-  // Fetch quiz data, casting the 'id' string to Id<"quizzes">
+  // Fetch quiz data
   const quizData = useQuery(
     api.quizzes.getQuizDetails,
     id ? { id: id as Id<"quizzes"> } : "skip"
   );
   const quiz = quizData?.quiz;
   const questions = quizData?.questions;
+  const sortedQuestions = questions
+    ? [...questions].sort((a, b) => a.order_number - b.order_number)
+    : [];
+  const isOwner = quizData?.isOwner;
+  const isHost = quizData?.isHost;
+  const canShare = quizData?.canShare;
+  const ownerName = quizData?.ownerName || "Quiz Owner";
 
-  // Get the createSession mutation
   const createSessionMutation = useMutation(api.sessions.createSession);
 
   const startQuiz = async () => {
     if (!id) return;
 
-    // Check if auth is loaded
     if (!isLoaded) {
-      toast({ 
-        title: "Loading...", 
-        description: "Please wait while we verify your authentication" 
+      toast({
+        title: "Loading...",
+        description: "Please wait while we verify your authentication"
       });
       return;
     }
 
-    // Check if user is signed in
     if (!isSignedIn) {
-      toast({ 
-        title: "Authentication Required", 
-        description: "Please sign in to host a quiz", 
-        variant: "destructive" 
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to host a quiz",
+        variant: "destructive"
       });
       return;
     }
 
     setLoading(true);
     try {
-      // Call the mutation, casting the 'id' string
       const sessionId = await createSessionMutation({
         quizId: id as Id<"quizzes">,
       });
-
-      // Navigate to the host page
       navigate(`/host/${sessionId}`);
     } catch (error: any) {
       const errorMessage = error?.message || "Unknown error occurred";
-      
-      if (errorMessage.includes("logged in")) {
-        toast({ 
-          title: "Authentication Error", 
-          description: "Please sign out and sign back in, then try again", 
-          variant: "destructive" 
-        });
-      } else if (errorMessage.includes("not authorized")) {
-        toast({ 
-          title: "Not Authorized", 
-          description: "You can only host quizzes you created", 
-          variant: "destructive" 
-        });
-      } else {
-        toast({ 
-          title: "Error", 
-          description: `Failed to start quiz: ${errorMessage}`, 
-          variant: "destructive" 
-        });
-      }
+      toast({
+        title: "Error",
+        description: `Failed to start quiz: ${errorMessage}`,
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const copyQuizLink = () => {
-    const link = window.location.href;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    toast({ title: "Link Copied!", description: "Share this link with others" });
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Handle loading state while fetching data
   if (quizData === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -103,7 +82,6 @@ const QuizDetails = () => {
     );
   }
 
-  // Handle quiz not found
   if (quizData === null) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
@@ -120,72 +98,93 @@ const QuizDetails = () => {
     );
   }
 
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-200/30 via-zinc-200/80 to-zinc-200/80 dark:bg-gradient-to-b dark:from-black/80 dark:via-black/80 dark:to-black/80 py-8 ">
-      <div className="container max-w-4xl mx-auto px-2">
+      <div className="container max-w-4xl mx-auto px-4">
         <Button
           variant="ghost"
           onClick={() => navigate('/dashboard')}
-          className="hover:bg-gradient-to-r from-primary to-secondary mb-6 rounded-full text-zinc-500"
+          className="hover:bg-muted mb-6 rounded-full text-zinc-500"
         >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Home
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
         </Button>
 
-        <Card className="flex flex-col lg:flex-row justify-between items-betwwun p-5 mb-6">
-          <div>
-            <h1 className="text-2xl font-bold mb-2 bg-gradient-to-b from-primary to-orange-300 bg-clip-text text-transparent">
-              {quiz?.title}
-            </h1>
-            {quiz?.description && (
-              <p className="text-muted-foreground mb-2">{quiz.description}</p>
-            )} </div>
+        <Card className="p-6 mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <h1 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-b from-primary to-orange-400 bg-clip-text text-transparent">
+                  {quiz?.title}
+                </h1>
+                {isOwner && (
+                  <Badge variant="secondary" className="text-xs">
+                    Owned by you
+                  </Badge>
+                )}
+                {isHost && !isOwner && (
+                  <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">
+                    Host Access
+                  </Badge>
+                )}
+              </div>
+              {quiz?.description && (
+                <p className="text-muted-foreground text-sm">{quiz.description}</p>
+              )}
+            </div>
 
-          <div className="flex gap-4">
-            <Button
-              onClick={startQuiz}
-              disabled={loading}
-              size="sm"
-              className="bg-gradient-to-r from-primary to-secondary hover:opacity-70 px-3 py-2 text-sm sm:px-4 sm:py-2 sm:text-base md:px-5 md:py-3 md:text-md rounded-lg"
-            >
-              {loading ? (
-                <Loader2 className=" h-5 w-5 animate-spin" />
-              ) : (
-                <Play className="h-5 w-5" />
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button
+                onClick={() => navigate(`/create-quiz?quizId=${id}`)}
+                variant="outline"
+                size="sm"
+                className="rounded-lg text-sm"
+              >
+                <Edit className="h-4 w-4 mr-1.5" /> Edit Quiz
+              </Button>
+
+              {canShare && (
+                <Button
+                  onClick={() => setIsShareOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg text-sm"
+                >
+                  <Share2 className="h-4 w-4 mr-1.5 text-primary" /> Share
+                </Button>
               )}
-              Start Quiz
-            </Button>
-            <Button
-              onClick={copyQuizLink}
-              size="sm"
-              variant="outline"
-              className="hover:bg-gradient-to-r from-primary to-secondary px-2 py-2 text-sm sm:px-4 sm:py-2 sm:text-base md:px-5 md:py-3 md:text-md rounded-lg dark:text-zinc-400 hover:dark:text-black"
-            >
-              {copied ? (
-                <>
-                  <CheckCircle className="h-5 w-5" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-5 w-5" />
-                  Copy Host Link
-                </>
-              )}
-            </Button>
+
+              <Button
+                onClick={startQuiz}
+                disabled={loading}
+                size="sm"
+                className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-primary-foreground font-semibold rounded-lg px-4"
+              >
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : (
+                  <Play className="h-4 w-4 mr-1.5" />
+                )}
+                Host Quiz
+              </Button>
+            </div>
           </div>
         </Card>
 
-        <h2 className="text-2xl font-bold mb-4 dark:text-zinc-200">Questions ({questions?.length || 0})</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-foreground">Questions ({questions?.length || 0})</h2>
+        </div>
+
         <div className="space-y-4">
-          {questions?.map((question, index) => (
-            <Card key={question._id} className="p-6">
+          {sortedQuestions.map((question, index) => (
+            <Card key={question._id} className="p-5">
               <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-lg text-orange-300">Question {index + 1}</h3>
-                <span className="text-sm text-muted-foreground">{question.time_limit}s</span>
+                <h3 className="font-semibold text-md text-orange-400">Question {index + 1}</h3>
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                  {question.time_limit}s
+                </span>
               </div>
-              <p className="mb-3 dark:text-zinc-200">{question.question_text}</p>
+              <p className="mb-3 text-foreground text-sm font-medium">{question.question_text}</p>
               {question.question_image_url && (
                 <img
                   src={question.question_image_url}
@@ -193,16 +192,16 @@ const QuizDetails = () => {
                   className="w-full max-h-64 object-contain rounded-lg mb-3"
                 />
               )}
-              <div className="grid grid-cols-2 gap-2 dark:text-zinc-300">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs md:text-sm">
                 {['A', 'B', 'C', 'D'].map(option => {
-                  const optionText = question[`option_${option.toLowerCase()}`];
+                  const optionText = (question as any)[`option_${option.toLowerCase()}`];
                   if (!optionText) return null;
                   return (
                     <div
                       key={option}
-                      className={`p-3 rounded-lg border ${question.correct_answer === option
-                          ? 'bg-success/10 border-success'
-                          : 'bg-muted'
+                      className={`p-2.5 rounded-lg border ${question.correct_answer === option
+                          ? 'bg-emerald-500/10 border-emerald-500/50 font-semibold text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted/40 border-muted'
                         }`}
                     >
                       <span className="font-bold mr-2">{option}.</span>
@@ -215,6 +214,16 @@ const QuizDetails = () => {
           ))}
         </div>
       </div>
+
+      {/* Share Quiz Modal */}
+      {id && (
+        <ShareQuizModal
+          quizId={id as Id<"quizzes">}
+          quizTitle={quiz?.title}
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
+        />
+      )}
     </div>
   );
 };

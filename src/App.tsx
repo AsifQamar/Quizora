@@ -19,6 +19,7 @@ import PlayQuiz from "./pages/PlayQuiz";
 import NotFound from "./pages/NotFound";
 import MyAttempts from "./pages/MyAttempts";
 import AttemptDetails from "./pages/AttemptDetails";
+import InviteAcceptance from "./pages/InviteAcceptance";
 
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const AppContent = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/create-quiz" element={<CreateQuiz />} />
           <Route path="/join" element={<JoinQuiz />} />
+          <Route path="/quiz/invite/:token" element={<InviteAcceptance />} />
           <Route path="/quiz/:id" element={<QuizDetails />} />
           <Route path="/host/:sessionId" element={<HostQuiz />} />
           <Route path="/review-mistakes/:sessionId" element={<PlayQuiz />} />

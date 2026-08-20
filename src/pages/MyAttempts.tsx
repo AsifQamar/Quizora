@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { ArrowLeft } from "lucide-react";
+
 
 export default function MyAttempts() {
   const navigate = useNavigate();
@@ -21,10 +23,18 @@ export default function MyAttempts() {
   const uniqueAttempts = Array.from(uniqueAttemptsMap.values());
   return (
     <div className="p-14 space-y-4">
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/dashboard')}
+        className="mb-2 rounded-full text-gray-500 dark:hover:bg-orange-300/50"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Home
+      </Button>
       <h1 className="text-3xl font-bold px-5">My Attempts</h1>
 
       {uniqueAttempts.length === 0 && (
-        <p>No attempts yet.</p>
+        <p className="px-7">No attempts yet.</p>
       )}
 
       {uniqueAttempts.map((a: any) => (
