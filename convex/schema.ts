@@ -96,4 +96,36 @@ export default defineSchema({
     .index("by_participant_question", ["participantId", "questionId"])
     .index("by_session_question_time", ["sessionId", "questionId", "time_taken"])
     .index("by_participant_session", ["participantId", "sessionId"]),
+
+  // 'quiz_access' table for shared host permissions
+  quiz_access: defineTable({
+    quizId: v.id("quizzes"),
+    userId: v.string(), // Clerk user ID of the host
+    role: v.literal("host"),
+    grantedBy: v.string(), // Clerk user ID of the owner
+    status: v.union(v.literal("active"), v.literal("revoked")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_quiz", ["quizId"])
+    .index("by_user", ["userId"])
+    .index("by_quiz_and_user", ["quizId", "userId"]),
+
+  // 'quiz_invites' table for host invitation links
+  quiz_invites: defineTable({
+    quizId: v.id("quizzes"),
+    token: v.string(), // Unique unpredictable token
+    createdBy: v.string(), // Clerk user ID of the creator/owner
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("revoked"),
+      v.literal("expired")
+    ),
+    createdAt: v.number(),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_quiz", ["quizId"])
+    .index("by_quiz_status", ["quizId", "status"]),
 });

@@ -13,6 +13,7 @@ import type * as gameplay from "../gameplay.js";
 import type * as quizzes from "../quizzes.js";
 import type * as router from "../router.js";
 import type * as sessions from "../sessions.js";
+import type * as sharing from "../sharing.js";
 import type * as users from "../users.js";
 
 import type {
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   quizzes: typeof quizzes;
   router: typeof router;
   sessions: typeof sessions;
+  sharing: typeof sharing;
   users: typeof users;
 }>;
 

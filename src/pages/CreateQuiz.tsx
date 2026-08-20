@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Image as ImageIcon, ArrowLeft, Settings, X } from "lucide-react";
@@ -53,8 +54,29 @@ const CreateQuiz = () => {
   const createQuizMutation = useMutation(api.quizzes.createQuiz);
   const editQuizMutation = useMutation(api.quizzes.editQuiz);
 
-  // Populate form when existing data loads
+  const draftKey = quizIdParam ? `quizora_draft_edit_${quizIdParam}` : `quizora_draft_new`;
+  const isLoadedRef = useRef(false);
+
+  // Populate form from local draft or existing quiz when data loads
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.title !== undefined) setTitle(draft.title);
+        if (draft.description !== undefined) setDescription(draft.description);
+        if (draft.questions && Array.isArray(draft.questions) && draft.questions.length > 0) {
+          setQuestions(draft.questions);
+        }
+        if (draft.timeForAll !== undefined) setTimeForAll(draft.timeForAll);
+        if (draft.applyDefaultTime !== undefined) setApplyDefaultTime(draft.applyDefaultTime);
+        isLoadedRef.current = true;
+        return;
+      }
+    } catch (e) {
+      console.error("Failed to load draft:", e);
+    }
+
     if (existingQuiz) {
       setTitle(existingQuiz.quiz.title);
       setDescription(existingQuiz.quiz.description || "");
@@ -74,10 +96,24 @@ const CreateQuiz = () => {
             order_number: q.order_number,
           };
         });
-        setQuestions(formattedQuestions);
+        setQuestions([...formattedQuestions].reverse());
       }
+      isLoadedRef.current = true;
+    } else if (!quizIdParam) {
+      isLoadedRef.current = true;
     }
-  }, [existingQuiz]);
+  }, [existingQuiz, quizIdParam, draftKey]);
+
+  // Auto-save unsaved form state to localStorage
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+    try {
+      const draft = { title, description, questions, timeForAll, applyDefaultTime };
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch (e) {
+      console.error("Failed to auto-save draft:", e);
+    }
+  }, [title, description, questions, timeForAll, applyDefaultTime, draftKey]);
 
   const TIME_OPTIONS: { label: string; value: number }[] = [
     { label: "5 secs", value: 5 },
@@ -99,7 +135,6 @@ const CreateQuiz = () => {
 
   const addQuestion = () => {
     setQuestions([
-      ...questions,
       {
         question_text: "",
         question_image_url: "",
@@ -108,6 +143,7 @@ const CreateQuiz = () => {
         time_limit: applyDefaultTime ? timeForAll : 30,
         order_number: questions.length,
       },
+      ...questions,
     ]);
   };
 
@@ -196,7 +232,8 @@ const CreateQuiz = () => {
 
     setLoading(true);
     try {
-      const mappedQuestions = questions.map((q, index) => {
+      const logicalQuestions = [...questions].reverse();
+      const mappedQuestions = logicalQuestions.map((q, index) => {
         const mapped: any = {
           question_text: q.question_text,
           question_image_url: q.question_image_url || undefined,
@@ -232,6 +269,11 @@ const CreateQuiz = () => {
         toast({ title: "Success!", description: "Quiz created successfully" });
       }
 
+      try {
+        localStorage.removeItem(draftKey);
+      } catch (e) {
+        // ignore storage errors
+      }
       navigate("/dashboard");
 
     } catch (error: any) {
@@ -258,9 +300,24 @@ const CreateQuiz = () => {
         </Button>
 
         <Card className="p-2 sm:p-5 md:p-6 lg:p-8 shadow-lg rounded-2xl border-2 border-transparent hover:border-primary transition-all duration-300">
-          <h1 className="text-2xl sm:text-2xl md:text-2xl lg:text-4xl font-bold mb-8 bg-gradient-to-b from-primary to-orange-300 bg-clip-text text-transparent">
-            {quizIdParam ? "Edit Quiz" : "Create Your Quiz"}
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <h1 className="text-2xl sm:text-2xl md:text-2xl lg:text-4xl font-bold bg-gradient-to-b from-primary to-orange-300 bg-clip-text text-transparent">
+              {quizIdParam ? "Edit Quiz" : "Create Your Quiz"}
+            </h1>
+            {quizIdParam && existingQuiz && (
+              <div>
+                {existingQuiz.isOwner ? (
+                  <Badge variant="secondary" className="text-xs">
+                    Owner
+                  </Badge>
+                ) : existingQuiz.isHost ? (
+                  <Badge variant="secondary" className="text-xs">
+                    Editing as Host
+                  </Badge>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           <div className="space-y-6 mb-8">
             <div>
@@ -290,13 +347,23 @@ const CreateQuiz = () => {
             <div className="relative">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Questions</h2>
-                <Button
-                  variant="link"
-                  onClick={() => setShowSettings((s) => !s)}
-                  className="rounded-full text-gray-500"
-                >
-                  <Settings className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    onClick={addQuestion}
+                    className="rounded-full p-2 dark:hover:bg-muted dark:hover:text-white/70 dark:text-orange-200"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </Button>
+                  <Button
+                    variant="link"
+                    onClick={() => setShowSettings((s) => !s)}
+                    className="rounded-full text-gray-500"
+                  >
+                    <Settings className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
 
               {showSettings && (
@@ -358,7 +425,7 @@ const CreateQuiz = () => {
             {questions.map((question, index) => (
               <Card key={index} className="p-2 sm:p-2 md:p-4 lg:p-6 border-2 dark:text-zinc-200">
                 <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-lg font-semibold text-orange-300">Question {index + 1}</h3>
+                  <h3 className="text-lg font-semibold text-orange-300">Question {questions.length - index}</h3>
                   {questions.length > 1 && (
                     <Button
                       variant="ghost"
@@ -473,21 +540,15 @@ const CreateQuiz = () => {
               </Card>
             ))}
           </div>
-          
-           <div className="flex flex-col lg:flex-row justify-between">
 
-            <div className="mt-5">
-              <Button variant="ghost" onClick={addQuestion} className="rounded-full p-2  dark:hover:bg-muted dark:hover:text-white/70 dark:text-secondar  dark:text-orange-200">
-                <Plus className="h-4 w-4" />
-                Add Question
-              </Button>
-            </div>
-            <div className="w-23 mt-5 flex flex-row justify-center">
+          <div className="flex flex-col lg:flex-row justify-center">
+
+            <div className="w-full mt-5 flex flex-row justify-center">
               <Button
                 onClick={handleSave}
                 disabled={loading}
                 size="lg"
-                className="text-lg bg-gradient-to-b from-primary via-secondary to-accent hover:opacity-90 rounded-xl hover:text-primary-foreground"
+                className="text-lg bg-gradient-to-b from-primary via-secondary to-accent hover:opacity-90 rounded-xl hover:text-primary-foreground w-full"
               >
                 {loading ? "Saving..." : (quizIdParam ? "Update Quiz" : "Create Quiz")}
               </Button>

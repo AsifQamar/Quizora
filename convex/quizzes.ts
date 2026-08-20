@@ -1,6 +1,6 @@
-// convex/quizzes.ts
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { canEditQuiz, hasQuizHostAccess } from "./sharing";
 
 // Admin: Create a new quiz and its questions
 export const createQuiz = mutation({
@@ -54,7 +54,7 @@ export const createQuiz = mutation({
   },
 });
 
-// Admin: Edit an existing quiz
+// Admin: Edit an existing quiz (Owner or Host)
 export const editQuiz = mutation({
   args: {
     quizId: v.id("quizzes"),
@@ -79,11 +79,16 @@ export const editQuiz = mutation({
     if (!identity) {
       throw new Error("You must be logged in to edit a quiz.");
     }
-    const creatorId = identity.subject;
+    const userId = identity.subject;
 
     const quiz = await ctx.db.get(args.quizId);
-    if (!quiz || quiz.creatorId !== creatorId) {
-      throw new Error("Quiz not found or you are not authorized to edit it.");
+    if (!quiz) {
+      throw new Error("Quiz not found.");
+    }
+
+    const authorized = await canEditQuiz(ctx, args.quizId, userId);
+    if (!authorized) {
+      throw new Error("You are not authorized to edit this quiz.");
     }
 
     // Update quiz details
@@ -136,7 +141,29 @@ export const getQuizDetails = query({
       .order("asc")
       .collect();
 
-    return { quiz, questions, creatorId: quiz.creatorId };
+    const identity = await ctx.auth.getUserIdentity();
+    let isOwner = false;
+    let isHost = false;
+
+    if (identity) {
+      isOwner = quiz.creatorId === identity.subject;
+      isHost = await hasQuizHostAccess(ctx, args.id, identity.subject);
+    }
+
+    const ownerUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", quiz.creatorId))
+      .first();
+
+    return {
+      quiz,
+      questions,
+      creatorId: quiz.creatorId,
+      ownerName: ownerUser?.name || "Quiz Owner",
+      isOwner,
+      isHost,
+      canShare: isOwner,
+    };
   },
 });
 
@@ -182,6 +209,24 @@ export const deleteQuiz = mutation({
 
     for (const q of questions) {
       await ctx.db.delete(q._id);
+    }
+
+    // Clean up related access records
+    const accessRecords = await ctx.db
+      .query("quiz_access")
+      .withIndex("by_quiz", (q) => q.eq("quizId", args.id))
+      .collect();
+    for (const acc of accessRecords) {
+      await ctx.db.delete(acc._id);
+    }
+
+    // Clean up related invite links
+    const invites = await ctx.db
+      .query("quiz_invites")
+      .withIndex("by_quiz", (q) => q.eq("quizId", args.id))
+      .collect();
+    for (const inv of invites) {
+      await ctx.db.delete(inv._id);
     }
 
     // Delete the quiz
