@@ -19,14 +19,29 @@ const checkHost = async (ctx: MutationCtx, sessionId: Id<"quiz_sessions">) => {
 };
 
 
+const getTotalQuestionsCount = async (ctx: any, session: any) => {
+  if (session.total_questions !== undefined && session.total_questions !== null) {
+    return session.total_questions;
+  }
+  if (session.customQuestionIds) {
+    return session.customQuestionIds.length;
+  }
+  const questions = await ctx.db
+    .query("questions")
+    .withIndex("by_quizId_order", (q: any) => q.eq("quizId", session.quizId))
+    .collect();
+  return questions.length;
+};
+
 export const startQuiz = mutation({
   args: {
     sessionId: v.id("quiz_sessions"),
   },
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
+    const totalQuestions = await getTotalQuestionsCount(ctx, session);
 
-    if (session.total_questions === 0) {
+    if (totalQuestions === 0) {
       throw new Error("No questions found for this quiz.");
     }
 
@@ -47,6 +62,7 @@ export const startQuiz = mutation({
 
     await ctx.db.patch(args.sessionId, {
       status: "active",
+      total_questions: totalQuestions,
       current_question_index: 0,
       current_question_id: firstQuestion._id,
       show_leaderboard: false,
@@ -64,9 +80,10 @@ export const showLeaderboard = mutation({
   },
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
+    const totalQuestions = await getTotalQuestionsCount(ctx, session);
 
     // O(1) — use cached total_questions instead of querying the questions table
-    if (session.current_question_index === session.total_questions - 1) {
+    if (session.current_question_index === totalQuestions - 1) {
       // Last question → finish the quiz
       await ctx.db.patch(args.sessionId, {
         status: "finished",
@@ -88,11 +105,12 @@ export const nextQuestion = mutation({
   },
   handler: async (ctx, args) => {
     const session = await checkHost(ctx, args.sessionId);
+    const totalQuestions = await getTotalQuestionsCount(ctx, session);
 
     const nextIndex = session.current_question_index + 1;
 
     // O(1) — compare against cached total_questions
-    if (session.current_question_index === session.total_questions - 1) {
+    if (session.current_question_index === totalQuestions - 1) {
       // Already on the last question → finish
       await ctx.db.patch(args.sessionId, {
         status: "finished",

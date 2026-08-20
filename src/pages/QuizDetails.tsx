@@ -117,16 +117,6 @@ const QuizDetails = () => {
                 <h1 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-b from-primary to-orange-400 bg-clip-text text-transparent">
                   {quiz?.title}
                 </h1>
-                {isOwner && (
-                  <Badge variant="secondary" className="text-xs">
-                    Owned by you
-                  </Badge>
-                )}
-                {isHost && !isOwner && (
-                  <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 text-xs">
-                    Host Access
-                  </Badge>
-                )}
               </div>
               {quiz?.description && (
                 <p className="text-muted-foreground text-sm">{quiz.description}</p>
@@ -200,8 +190,8 @@ const QuizDetails = () => {
                     <div
                       key={option}
                       className={`p-2.5 rounded-lg border ${question.correct_answer === option
-                          ? 'bg-emerald-500/10 border-emerald-500/50 font-semibold text-emerald-600 dark:text-emerald-400'
-                          : 'bg-muted/40 border-muted'
+                        ? 'bg-emerald-500/10 border-emerald-500/50 font-semibold text-emerald-600 dark:text-emerald-400'
+                        : 'bg-muted/40 border-muted'
                         }`}
                     >
                       <span className="font-bold mr-2">{option}.</span>

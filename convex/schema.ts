@@ -53,7 +53,7 @@ export default defineSchema({
 
     // --- Write-side metadata for O(1) lookups ---
     // Cached total number of questions (set at session creation)
-    total_questions: v.number(),
+    total_questions: v.optional(v.number()),
     // Direct reference to the current question document (avoids index scan)
     current_question_id: v.optional(v.id("questions")),
 
